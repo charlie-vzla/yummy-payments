@@ -4,7 +4,6 @@ export enum PaymentStatus {
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   ERROR = 'ERROR',
-  FAILED = 'FAILED',
 }
 
 export const TERMINAL_PAYMENT_STATUSES: PaymentStatus[] = [

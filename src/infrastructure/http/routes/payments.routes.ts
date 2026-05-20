@@ -1,25 +1,29 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { PaymentService } from '../../../application/services/PaymentService';
-import { createPaymentBodySchema } from '../validation/payment.schemas';
+import {
+  createPaymentBodySchema,
+  createPaymentParamsSchema,
+} from '../validation/payment.schemas';
 
 export function createPaymentsRouter(paymentService: PaymentService): Router {
   const router = Router();
 
-  router.post('/create', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/create/:orderId', async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const { orderId } = createPaymentParamsSchema.parse(req.params);
       const body = createPaymentBodySchema.parse(req.body);
-      const orderId = body.orderId ?? req.header('X-Order-Id');
 
-      if (!orderId) {
+      if (!req.apiKey) {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
-          message: 'orderId is required in body or X-Order-Id header',
+          message: 'X-Api-Key header is required',
         });
         return;
       }
 
       const result = await paymentService.create({
         orderId,
+        merchantId: req.apiKey,
         paymentMethodToken: body.paymentMethodToken,
         amount: body.amount,
       });

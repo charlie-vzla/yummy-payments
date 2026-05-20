@@ -1,14 +1,19 @@
+import { randomUUID } from 'crypto';
 import {
   PaymentProviderPort,
   ProviderChargeRequest,
   ProviderChargeResponse,
 } from '../../domain/ports/PaymentProviderPort';
-import { NotImplementedError } from '../../shared/errors/AppError';
+import { resolveMockProviderOutcome } from './mockProviderRules';
 
 export class MockPaymentProvider implements PaymentProviderPort {
-  async charge(_request: ProviderChargeRequest): Promise<ProviderChargeResponse> {
-    throw new NotImplementedError(
-      'Mock payment provider rules will be implemented in a follow-up',
-    );
+  async charge(request: ProviderChargeRequest): Promise<ProviderChargeResponse> {
+    const { status, reasonCode } = resolveMockProviderOutcome(request.amount);
+
+    return {
+      providerPaymentId: `pp_${randomUUID()}`,
+      status,
+      reasonCode,
+    };
   }
 }

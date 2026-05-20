@@ -22,7 +22,7 @@ docker compose up --build
 The API will be available at `http://localhost:3000`.
 
 - Health: `GET /health`
-- Create payment: `POST /payments/create` (stub — returns 501 until implemented)
+- Create payment: `POST /payments/create/:orderId`
 - Get payment: `GET /payments/:orderId`
 
 Migrations run automatically on startup via `prisma migrate deploy` and live in **`prisma/migrations/`**.
@@ -69,10 +69,22 @@ src/
     └── providers/       # Mock payment provider (driven adapter)
 ```
 
+## Mock payment provider
+
+The mock provider ([`MockPaymentProvider`](src/infrastructure/providers/MockPaymentProvider.ts)) simulates an external gateway. Amounts are in **centavos** (see [Referencia — Servicios Externos](docs/REFERENCIA-SERVICIOS-EXTERNOS.md)).
+
+| Amount (cents) | Provider `status` | `reasonCode` |
+|----------------|-------------------|--------------|
+| `<= 100000` | `APPROVED` | — |
+| `> 100000` (except below) | `REJECTED` | `INSUFFICIENT_FUNDS` |
+| `999900` | `ERROR` | `PROVIDER_INTERNAL_ERROR` |
+
+`999900` takes priority over the `> 100000` rejection rule.
+
 ## API notes
 
 - Authentication header: `X-Api-Key` (pass-through; no validation per design assumptions).
-- Create payment requires `orderId` in the JSON body or `X-Order-Id` header (in addition to `paymentMethodToken` and `amount`).
+- Create payment: `POST /payments/create/:orderId` with body `paymentMethodToken` + `amount` (cents). `X-Api-Key` is used as `merchantId`.
 - At most one payment per `(orderId, amount)` — enforced by DB unique constraint (full flow in a follow-up).
 
 ## Logging (Pino)
@@ -110,6 +122,8 @@ HTTP requests are logged with `pino-http` (`/health` excluded). Each request get
 | `npm run db:deploy` | Apply migrations (production) |
 | `npm run db:generate` | Generate Prisma client |
 | `npm run lint` | Run ESLint |
+| `npm test` | Run Jest unit tests |
+| `npm run test:watch` | Run Jest in watch mode |
 
 ## Environment variables
 
@@ -121,7 +135,9 @@ See [`.env.example`](.env.example):
 | `DATABASE_URL` | PostgreSQL connection string |
 | `REDIS_URL` | Redis connection string |
 | `API_KEY` | Placeholder API key |
-| `MERCHANT_ID` | Default merchant id for provider calls |
+| `PAYMENT_PROVIDER_MAX_RETRIES` | Retries after provider ERROR (default `3`) |
+| `IDEMPOTENCY_LOCK_TTL_SECONDS` | Redis lock TTL during processing |
+| `IDEMPOTENCY_RECORD_TTL_SECONDS` | Redis idempotency marker TTL |
 | `LOG_LEVEL` | Pino log level |
 | `LOG_PRETTY` | Pretty-print logs for local dev |
 | `LOG_DESTINATION` | `stdout` or `file` |

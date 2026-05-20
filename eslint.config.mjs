@@ -11,11 +11,26 @@ export default [
   },
   {
     files: ['src/**/*.ts'],
+    ignores: ['src/**/*.test.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
         project: './tsconfig.json',
       },
+    },
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+    },
+    rules: {
+      ...tsPlugin.configs.recommended.rules,
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: ['src/**/*.test.ts'],
+    languageOptions: {
+      parser: tsParser,
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
