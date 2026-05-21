@@ -4,6 +4,7 @@ import { env, validateEnv } from './config/env';
 import { PaymentService } from './application/services/PaymentService';
 import { PrismaOrderRepository } from './infrastructure/persistence/prisma/PrismaOrderRepository';
 import { RedisIdempotencyStore } from './infrastructure/cache/redis/RedisIdempotencyStore';
+import { RedisPaymentReadCache } from './infrastructure/cache/redis/RedisPaymentReadCache';
 import { MockPaymentProvider } from './infrastructure/providers/MockPaymentProvider';
 import { prisma } from './infrastructure/persistence/prisma/client';
 import { createLogger } from './shared/logging/createLogger';
@@ -17,11 +18,13 @@ async function main(): Promise<void> {
   const paymentProvider = new MockPaymentProvider();
   const redis = new Redis(env.redisUrl);
   const idempotencyStore = new RedisIdempotencyStore(redis);
+  const paymentReadCache = new RedisPaymentReadCache(redis);
 
   const paymentService = new PaymentService(
     orderRepository,
     paymentProvider,
     idempotencyStore,
+    paymentReadCache,
     logger,
   );
 

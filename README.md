@@ -2,11 +2,6 @@
 
 Node.js + TypeScript payment orchestrator service with hexagonal architecture, Express, PostgreSQL (Prisma), and Redis.
 
-## Documentation
-
-- [API](docs/API.md)
-- [Referencia — Servicios Externos](docs/REFERENCIA-SERVICIOS-EXTERNOS.md)
-
 ## Prerequisites
 
 - Docker & Docker Compose
@@ -20,6 +15,20 @@ docker compose up --build
 ```
 
 The API will be available at `http://localhost:3000`.
+
+**pgAdmin** (database UI): `http://localhost:5050` — login `admin@admin.com` / `admin` (dev only).
+
+To register the Postgres server in pgAdmin: **Add New Server** → **Connection** tab:
+
+| Field | Value |
+|-------|--------|
+| Host | `postgres` |
+| Port | `5432` |
+| Maintenance database | `yummy_payments` |
+| Username | `postgres` |
+| Password | `postgres` |
+
+Use host `postgres` (Docker service name), not `localhost`, when pgAdmin runs inside Compose.
 
 - Health: `GET /health`
 - Create payment: `POST /payments/create/:orderId`
@@ -111,6 +120,49 @@ Payment flow events (`payment_create_started`, `payment_get_completed`, etc.) ar
 
 HTTP requests are logged with `pino-http` (`/health` excluded). Each request gets an `X-Request-Id` header.
 
+> **Docker:** set `LOG_PRETTY=false` in `.env` (or override in `docker-compose.yml`). The production image does not include `pino-pretty` (it is a dev dependency).
+
+## Testing concurrent creates (race / idempotency)
+
+Postman does not fire truly parallel requests easily. Use the shell script or curl with background jobs.
+
+### Script (recommended)
+
+With the API running (`docker compose up` or `npm run dev`):
+
+```bash
+chmod +x scripts/race-create.sh
+export API_KEY=your-api-key   # match .env
+./scripts/race-create.sh race-manual-1 20
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| 1 — `orderId` | `race-<timestamp>` | Same id for all parallel requests |
+| 2 — concurrency | `20` | Number of parallel POSTs |
+
+Optional env: `BASE` (default `http://localhost:3000`), `AMOUNT` (default `50000`).
+
+**Expected:** mostly **200** (create or idempotent duplicate), sometimes **409** `PAYMENT_IN_PROGRESS`. Exactly **one** row in `orders` for that `(orderId, amount)` in pgAdmin.
+
+### One-liner (curl only)
+
+```bash
+ORDER_ID="race-$(date +%s)"
+API_KEY="your-api-key"
+
+for i in $(seq 1 20); do
+  curl -s -w "\nreq-$i HTTP %{http_code}\n" \
+    -X POST "http://localhost:3000/payments/create/${ORDER_ID}" \
+    -H "X-Api-Key: ${API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d '{"paymentMethodToken":"tok_test","amount":50000}' &
+done
+wait
+```
+
+Watch app logs: `docker compose logs -f app`.
+
 ## Scripts
 
 | Script | Description |
@@ -124,6 +176,7 @@ HTTP requests are logged with `pino-http` (`/health` excluded). Each request get
 | `npm run lint` | Run ESLint |
 | `npm test` | Run Jest unit tests |
 | `npm run test:watch` | Run Jest in watch mode |
+| `scripts/race-create.sh` | Parallel create requests (manual race / idempotency test) |
 
 ## Environment variables
 

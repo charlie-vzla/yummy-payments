@@ -1,8 +1,9 @@
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { env } from '../../config/env';
 import { Order } from '../../domain/models/Order';
 import { PaymentStatus } from '../../domain/models/PaymentStatus';
 import { IdempotencyStorePort } from '../../domain/ports/IdempotencyStorePort';
+import { PaymentReadCachePort } from '../ports/PaymentReadCachePort';
 import { OrderRepositoryPort } from '../../domain/ports/OrderRepositoryPort';
 import {
   PaymentProviderPort,
@@ -29,6 +30,7 @@ export class PaymentService {
     private readonly orderRepository: OrderRepositoryPort,
     private readonly paymentProvider: PaymentProviderPort,
     private readonly idempotencyStore: IdempotencyStorePort,
+    private readonly paymentReadCache: PaymentReadCachePort,
     logger: LoggerPort,
   ) {
     this.log = logger.child({ component: 'PaymentService' });
@@ -142,8 +144,17 @@ export class PaymentService {
     }
   }
 
-  async get(orderId: string) {
+  async get(orderId: string): Promise<GetPaymentResponseDto> {
     this.log.info({ event: 'payment_get_started', orderId }, 'payment_get_started');
+
+    const cached = await this.paymentReadCache.get(orderId);
+    if (cached) {
+      this.log.info(
+        { event: 'payment_get_cache_hit', orderId, status: cached.status },
+        'payment_get_cache_hit',
+      );
+      return cached;
+    }
 
     const order = await this.orderRepository.findByOrderId(orderId);
     if (!order) {
@@ -152,14 +163,23 @@ export class PaymentService {
     }
 
     const response = this.toGetPaymentResponse(order);
+
+    if (this.isTerminalStatus(order.status)) {
+      await this.paymentReadCache.set(orderId, response);
+      this.log.info(
+        { event: 'payment_get_cache_populated', orderId, status: response.status },
+        'payment_get_cache_populated',
+      );
+    }
+
     this.log.info(
       {
-        event: 'payment_get_completed',
+        event: 'payment_get_cache_miss',
         orderId,
         status: response.status,
         retries: response.retries,
       },
-      'payment_get_completed',
+      'payment_get_cache_miss',
     );
 
     return response;
@@ -276,6 +296,14 @@ export class PaymentService {
     return this.orderRepository.update(order);
   }
 
+  private isTerminalStatus(status: PaymentStatus): boolean {
+    return (
+      status === PaymentStatus.APPROVED ||
+      status === PaymentStatus.REJECTED ||
+      status === PaymentStatus.ERROR
+    );
+  }
+
   private mapReasonMessage(reasonCode: string | null): string {
     if (!reasonCode) {
       return '';
@@ -328,5 +356,5 @@ export class PaymentService {
 }
 
 function isPrismaUniqueViolation(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  return error instanceof PrismaClientKnownRequestError && error.code === 'P2002';
 }
