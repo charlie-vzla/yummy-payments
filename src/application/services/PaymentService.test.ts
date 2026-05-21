@@ -113,6 +113,7 @@ describe('PaymentService.create', () => {
 
     expect(result.status).toBe('APPROVED');
     expect(result.amount).toBe(50_000);
+    expect(result.referenceNumber).toBe(created.id);
     expect(paymentProvider.charge).toHaveBeenCalledTimes(1);
     expect(paymentReadCache.set).not.toHaveBeenCalled();
     expect(orderRepository.create).toHaveBeenCalledWith(
@@ -292,6 +293,7 @@ describe('PaymentService.get', () => {
       reasonCode: '',
       reason: '',
       retries: 0,
+      referenceNumber: 'order-uuid-1',
     };
 
     paymentReadCache.get.mockResolvedValue(cached);
@@ -357,6 +359,7 @@ describe('PaymentService.get', () => {
       reasonCode: '',
       reason: '',
       retries: 0,
+      referenceNumber: 'order-uuid-1',
     });
   });
 

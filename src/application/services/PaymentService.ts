@@ -324,14 +324,8 @@ export class PaymentService {
       status: this.toApiPaymentStatus(order.status),
       reasonCode: order.reasonCode ?? '',
       reason: order.reason ?? '',
+      referenceNumber: order.id
     };
-
-    if (order.reference) {
-      const referenceNumber = Number(order.reference);
-      if (!Number.isNaN(referenceNumber)) {
-        response.referenceNumber = referenceNumber;
-      }
-    }
 
     return response;
   }
@@ -342,14 +336,8 @@ export class PaymentService {
       reasonCode: order.reasonCode ?? '',
       reason: order.reason ?? '',
       retries: order.retries,
+      referenceNumber: order.id,
     };
-
-    if (order.reference) {
-      const referenceNumber = Number(order.reference);
-      if (!Number.isNaN(referenceNumber)) {
-        response.referenceNumber = referenceNumber;
-      }
-    }
 
     return response;
   }

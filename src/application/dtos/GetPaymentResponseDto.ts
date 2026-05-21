@@ -3,5 +3,5 @@ export interface GetPaymentResponseDto {
   reasonCode: string;
   reason: string;
   retries: number;
-  referenceNumber?: number;
+  referenceNumber?: string;
 }

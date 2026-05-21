@@ -3,5 +3,5 @@ export interface PaymentResponseDto {
   status: string;
   reasonCode: string;
   reason: string;
-  referenceNumber?: number;
+  referenceNumber?: string;
 }
