@@ -8,6 +8,7 @@ import { noopLogger } from '../../shared/logging/noopLogger';
 import { Order } from '../../domain/models/Order';
 import { PaymentStatus } from '../../domain/models/PaymentStatus';
 import { buildIdempotencyKey } from '../utils/idempotencyKey';
+import { env } from '../../config/env';
 
 const baseInput = {
   orderId: 'order-1',
@@ -121,7 +122,25 @@ describe('PaymentService.create', () => {
     );
   });
 
+  it('returns REJECTED for amount 50001 wont save order', async () => {
+    const { orderRepository, paymentProvider, idempotencyStore, paymentReadCache } = createMocks();
+
+    const service = createService(
+      orderRepository,
+      paymentProvider,
+      idempotencyStore,
+      paymentReadCache,
+    );
+
+    await expect(service.create({ ...baseInput, amount: 50_001})).rejects.toThrow();
+
+    expect(paymentProvider.charge).not.toHaveBeenCalled();
+    expect(paymentReadCache.set).not.toHaveBeenCalled();
+    expect(orderRepository.create).not.toHaveBeenCalled();
+  });
+
   it('returns REJECTED for amount 100001', async () => {
+    env.maxAmount = 100_0001;
     const { orderRepository, paymentProvider, idempotencyStore, paymentReadCache } = createMocks();
     const input = { ...baseInput, amount: 100_001 };
     const created = buildOrder({ amount: 100_001 });

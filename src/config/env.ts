@@ -15,6 +15,7 @@ export const env = {
   logPretty: process.env.LOG_PRETTY === 'true',
   logDestination: process.env.LOG_DESTINATION ?? 'stdout',
   logFile: process.env.LOG_FILE ?? '/var/log/yummy-payments/app.log',
+  maxAmount: process.env.MAX_AMOUNT ?? 100_000
 };
 
 export function validateEnv(): void {

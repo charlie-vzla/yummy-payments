@@ -39,6 +39,10 @@ export class PaymentService {
   async create(input: CreatePaymentDto): Promise<PaymentResponseDto> {
     const { orderId, amount, merchantId } = input;
 
+    if (amount > Number(env.maxAmount)) {
+      throw new AppError(400, `Amount is invalid pass amount less that max ${env.maxAmount}`, "PAYMENT_DENIED")
+    }
+
     let order: Order | null = null;
     const idempotencyValue = buildIdempotencyKey(orderId, amount);
 
