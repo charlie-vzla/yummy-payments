@@ -7,18 +7,68 @@ Node.js + TypeScript payment orchestrator service with hexagonal architecture, E
 - Docker & Docker Compose
 - Node.js 20+ (for local development without Docker)
 
-## Quick start (Docker)
+## Running with Docker (full stack)
+
+This is the default way to run **everything**: API, PostgreSQL, Redis, and pgAdmin. No local Node install required for the app.
+
+### 1. Configure environment
 
 ```bash
 cp .env.example .env
+```
+
+For Docker the `app` service overrides `DATABASE_URL` and `REDIS_URL` to use Compose hostnames (`postgres`, `redis`); your `.env` values for those are ignored inside the container.
+
+### 2. Start all services
+
+```bash
 docker compose up --build
 ```
 
-The API will be available at `http://localhost:3000`.
+First run builds the app image, starts dependencies, runs **`prisma migrate deploy`**, then starts the API.
 
-**pgAdmin** (database UI): `http://localhost:5050` — login `admin@admin.com` / `admin` (dev only).
+| Service | URL / port | Role |
+|---------|------------|------|
+| **app** | http://localhost:3000 | Payment API |
+| **postgres** | localhost:5432 | Database (`yummy_payments`) |
+| **redis** | localhost:6379 | Idempotency locks / markers |
+| **pgadmin** | http://localhost:5050 | DB UI (optional) |
 
-To register the Postgres server in pgAdmin: **Add New Server** → **Connection** tab:
+Run in the background:
+
+```bash
+docker compose up --build -d
+docker compose logs -f app    # follow API logs only
+```
+
+Stop:
+
+```bash
+docker compose down           # keep database data
+docker compose down -v        # wipe postgres + pgadmin volumes (fresh DB)
+```
+
+### 3. Verify
+
+```bash
+curl http://localhost:3000/health
+```
+
+API endpoints (header `X-Api-Key` must match `API_KEY` in `.env`):
+
+- Health: `GET /health`
+- Create payment: `POST /payments/create/:orderId`
+- Get payment: `GET /payments/:orderId`
+
+See [docs/API.md](docs/API.md) for request/response shapes.
+
+Migrations run automatically on each app start via [`scripts/docker-entrypoint.sh`](scripts/docker-entrypoint.sh) (`prisma migrate deploy`). SQL lives in **`prisma/migrations/`**.
+
+### pgAdmin
+
+Login: `admin@admin.com` / `admin` (dev only).
+
+**Add New Server** → **Connection**:
 
 | Field | Value |
 |-------|--------|
@@ -28,13 +78,7 @@ To register the Postgres server in pgAdmin: **Add New Server** → **Connection*
 | Username | `postgres` |
 | Password | `postgres` |
 
-Use host `postgres` (Docker service name), not `localhost`, when pgAdmin runs inside Compose.
-
-- Health: `GET /health`
-- Create payment: `POST /payments/create/:orderId`
-- Get payment: `GET /payments/:orderId`
-
-Migrations run automatically on startup via `prisma migrate deploy` and live in **`prisma/migrations/`**.
+Use host **`postgres`** (Compose service name), not `localhost`, when pgAdmin runs inside Docker.
 
 ## Local development (without Docker)
 
@@ -103,7 +147,7 @@ Structured JSON logs via [Pino](https://getpino.io/). Sensitive fields (`payment
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOG_LEVEL` | `info` | `trace`, `debug`, `info`, `warn`, `error` |
-| `LOG_PRETTY` | `false` | `true` for human-readable output (local dev) |
+| `LOG_PRETTY` | `false` | `true` for human-readable output (only for local dev, set to false when running app with docker) |
 | `LOG_DESTINATION` | `stdout` | `stdout` or `file` |
 | `LOG_FILE` | `/var/log/yummy-payments/app.log` | Used when `LOG_DESTINATION=file` |
 
@@ -119,8 +163,6 @@ Structured JSON logs via [Pino](https://getpino.io/). Sensitive fields (`payment
 Payment flow events (`payment_create_started`, `payment_get_completed`, etc.) are logged from `PaymentService` with safe fields only (`orderId`, `amount`, `status`, `reasonCode`).
 
 HTTP requests are logged with `pino-http` (`/health` excluded). Each request gets an `X-Request-Id` header.
-
-> **Docker:** set `LOG_PRETTY=false` in `.env` (or override in `docker-compose.yml`). The production image does not include `pino-pretty` (it is a dev dependency).
 
 ## Testing concurrent creates (race / idempotency)
 
